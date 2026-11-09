@@ -85,8 +85,8 @@ def main() -> int:
         )
         return 2
 
-    model_a = slot_model(cfg, "A")
-    model_b = slot_model(cfg, "B")
+    model_a = slot_model(cfg, "A", stage="spec")
+    model_b = slot_model(cfg, "B", stage="spec")
     spec_path = dirs["docs"] / "spec.md"
     if not spec_path.is_file():
         raise SystemExit(f"missing spec: {spec_path}")

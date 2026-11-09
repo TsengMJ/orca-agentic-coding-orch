@@ -46,6 +46,13 @@ orca orchestration worker-start \
 - If `gates.human_gate_plan`: same after Plan.
 - Never auto-merge in S0–S6; `gates.open_pr` only creates a PR when true.
 
+## Workflow healer (sidecar)
+
+- `workflow_server` starts a third cron when `healer.enabled` (see `config/workflow.yaml`).
+- Role: `memory/roles/roles/10-workflow-healer.md`. Manual once: `uv run --with pyyaml scripts/healer.py --once`.
+- Flakes → resume within `healer.max_auto_resume_per_run`. Orch bugs → diagnosis / optional draft fix PR (`healer.orch_fix`).
+- You still do not silently edit product artifacts; healer must not either.
+
 ## Stage prompts
 
 Render a self-contained prompt from `prompts/stages/*.md`, point the worker at the archived copy under `aac/.run/<run_id>/archive/`, and attach the matching role file from `memory/roles/roles/`.

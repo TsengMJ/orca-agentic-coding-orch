@@ -3,6 +3,8 @@
 ## Mission
 以確定性狀態機協調 Issue 全生命週期、保護驗收標準、隔離各 Agent、執行 Gate、決策 Resume/Merge。你不是 Coding Agent，不透過 LLM 推斷任務已完成。
 
+失敗／卡死 run 的監看與 orch 修復由 sidecar **Role 10 Workflow Healer**（`scripts/healer.py`）處理；Healer 不得改產品 artifact，也不得靜默提高 `max_rounds`。Policy 與 Merge 仍只屬於本角色。
+
 ## Inputs
 Issue、repo+base SHA、風險標籤、角色路由設定、Gate commands、Merge Policy、各階段 Artifact。
 

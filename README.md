@@ -4,13 +4,21 @@ Orca-native practice repo for the [adversarial-ai-coding](https://github.com/yhc
 
 ## Defaults (change in config)
 
-| Slot | Role | Runtime | Model |
-| --- | --- | --- | --- |
-| A | owner | Cursor | `grok-4.7-high` |
-| B | reviewer | Cursor | `composer-2.5` |
-| I | implementer | inherits A | — |
+Global fallbacks plus per-stage overrides in [`config/workflow.yaml`](config/workflow.yaml) `stage_models` (Free Cursor pool). Same stage never uses one model on both sides.
 
-Source of truth: [`config/workflow.yaml`](config/workflow.yaml) (created in S0). Swap models/gates there; do not hardcode in prompts.
+| Stage | A / I | B |
+| --- | --- | --- |
+| Spec | `composer-2.5` | `grok-4.6` |
+| Plan | `grok-4.6` | `composer-2.5` |
+| Acceptance | `grok-4.6` (review) | `composer-2.5` (write tests) |
+| Implement | `composer-2.5` (I) | — |
+| Gate | `composer-2.5` (I) | `grok-4.7` |
+| Final | `composer-2.5` | `grok-4.5` |
+
+```bash
+uv run --with pyyaml scripts/resolve_slot.py A --stage spec
+uv run --with pyyaml scripts/resolve_slot.py B --stage gate
+```
 
 Human gates (AAC-aligned):
 
@@ -41,6 +49,23 @@ uv run --project fixtures/dogfood --group dev pytest -q
 ./scripts/smoke_slots.sh
 ```
 
+## GitHub (1 issue = 1 draft PR)
+
+See [`docs/github-collab.md`](docs/github-collab.md). Label an issue `Ready` to enqueue it. Waiting PR labels are `Spec` → `Plan` → `Acceptance` → `Implement` → `Gate`; `/approve` becomes `*_Approved`. `Gate_Approved` merges into `dev`.
+
+```bash
+# start once: issue cron + PR cron + healer cron + GET /health
+uv run --with pyyaml scripts/workflow_server.py
+# healer alone: uv run --with pyyaml scripts/healer.py --once
+
+uv run --with pyyaml scripts/gh_collab.py publish --issue N --run-id <run-id>
+uv run --with pyyaml scripts/gh_collab.py check --issue N
+uv run --with pyyaml scripts/gh_collab.py apply --issue N --run-id <run-id>
+uv run --with pyyaml scripts/gh_collab.py watch
+```
+
+`/approve` on the PR advances the stage. `/abort` stops and closes the PR.
+
 ## S1 — Spec loop
 
 ```bash
@@ -48,6 +73,15 @@ uv run --project fixtures/dogfood --group dev pytest -q
 uv run --with pyyaml scripts/s1_spec_loop.py --stream --request "Add a Counter to fixtures/dogfood…"
 # after B approved:
 uv run --with pyyaml scripts/s1_human_gate.py --run-id <run_id> --approve   # or --abort
+```
+
+## S3 — Acceptance tests
+
+B writes tests, A reviews, then the workflow freezes hashes. A failing pytest is allowed.
+
+```bash
+uv run --with pyyaml scripts/s3_acceptance_loop.py --stream --run-id <run_id>
+uv run --with pyyaml scripts/protected_tests.py --run-id <run_id> --check
 ```
 
 Review/repair contract: [`docs/review-loop.md`](docs/review-loop.md) (AAC `MAX_ROUNDS`, same-call agent retries, abort+resume — **no unbounded review**).

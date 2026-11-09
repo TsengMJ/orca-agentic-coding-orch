@@ -1,0 +1,27 @@
+---
+description: Use memory/ as the project knowledge base; record lasting lessons there
+alwaysApply: true
+---
+
+# Project memory
+
+This repo’s durable knowledge lives under [`memory/`](memory/). Prefer it over inventing process from scratch.
+
+## Read first
+
+| Path | Use for |
+| --- | --- |
+| `memory/roles/` | AAC role briefs and review/merge contracts |
+| `memory/skills/` | Reusable skills and playbooks |
+| `memory/lessons/` | Distilled experience from real runs (what worked, what failed, what to avoid) |
+
+When the task touches orchestration, specs, review, or agent workflow, check the matching files under `memory/` before changing prompts or scripts.
+
+## Write lasting knowledge here
+
+If you learn something worth reusing—failed approaches, prompt/review pitfalls, dogfood gotchas, operational conventions—**record it under `memory/`**, usually as a short note in `memory/lessons/`.
+
+- Prefer small, dated or topic-named markdown files (e.g. `memory/lessons/spec-brevity.md`).
+- Update an existing role/skill when the lesson belongs there; do not only leave it in chat.
+- Do not dump raw run logs; distill into actionable guidance.
+- Transient run artifacts stay in `aac/` / `artifacts/`; they are not memory.

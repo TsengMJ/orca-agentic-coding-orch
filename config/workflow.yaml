@@ -9,16 +9,38 @@
 schema: 1
 
 slots:
+  # Global fallbacks when a stage has no override.
   A:
-    runtime: cursor
-    model: grok-4.7-high
-    args: []
-  B:
     runtime: cursor
     model: composer-2.5
     args: []
-  # null = inherit owner (roles.owner → slot A by default)
+  B:
+    runtime: cursor
+    model: grok-4.6
+    args: []
+  # null = inherit owner (roles.owner → slot A by default), then stage_models
   I: null
+
+# Per-stage A/B/I models (Free Cursor pool: grok-4.7 / 4.6 / 4.5 / composer-2.5).
+# Same stage never uses one model for both sides.
+stage_models:
+  spec:
+    A: composer-2.5
+    B: grok-4.6
+  plan:
+    A: grok-4.6
+    B: composer-2.5
+  acceptance:
+    A: grok-4.6
+    B: composer-2.5
+  implement:
+    I: composer-2.5
+  gate:
+    I: composer-2.5
+    B: grok-4.6
+  final:
+    A: composer-2.5
+    B: grok-4.5
 
 roles:
   owner: A
@@ -37,7 +59,8 @@ gates:
   # Optional: sh -c '<notify_cmd> "$1"' with message as $1
   notify_cmd: ""
   # Run from repo root; dogfood is the default GATE target for S0+
-  gate_cmd: "uv run --project fixtures/dogfood --group dev pytest -q"
+  # AAC_RUN_ID scopes acceptance to one feature so parallel dogfoods do not collide.
+  gate_cmd: "cd fixtures/dogfood && uv run --group dev pytest -q tests/test_smoke.py tests/acceptance/${AAC_RUN_ID}"
   build_gate_cmd: ""
   open_pr: false
 
@@ -49,6 +72,47 @@ orca:
   agent_hooks: required
   worktree_name_prefix: aac-
   keep_open_implement: true
+
+# Sidecar: watches failed/stuck runs; resume flakes; diagnose/fix orch bugs.
+# Does not replace Role 00; never edits product stage artifacts.
+healer:
+  enabled: true
+  poll_sec: 90
+  max_auto_resume_per_run: 1
+  stale_running_sec: 3600
+  # off = resume/escalate only; propose = diagnosis+notify; auto = spawn fix agent + draft PR
+  orch_fix: auto
+  # null = inherit slots.A model
+  model: null
+
+github:
+  repo: TsengMJ/orca-agentic-coding-orch
+  base: dev
+  # Default collaboration: one Issue, one branch, one draft PR.
+  # Branches are feature/<slug> or fix/<slug>. Pull requests merge into dev.
+  issue_pr: one-to-one
+  branch_kinds:
+    - feature
+    - fix
+  draft: true
+  max_jobs: 1
+  issue_poll_sec: 60
+  pr_poll_sec: 30
+  health_port: 8765
+  # One workflow label at a time. Ready is on issues; the rest are on draft PRs.
+  labels:
+    ready: Ready
+    spec: Spec
+    plan: Plan
+    acceptance: Acceptance
+    implement: Implement
+    gate: Gate
+    spec_approved: Spec_Approved
+    plan_approved: Plan_Approved
+    acceptance_approved: Acceptance_Approved
+    implement_approved: Implement_Approved
+    gate_approved: Gate_Approved
+    abort: Abort
 
 paths:
   aac_root: aac

@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -33,13 +34,15 @@ def load_prompt(name: str) -> str:
     return (ROOT / "prompts" / "stages" / name).read_text(encoding="utf-8")
 
 
-def checkbox_ids(text: str) -> list[str]:
+def checkbox_ids(text: str, run_id: str) -> list[str]:
     ids = []
+    full = re.compile(rf"\b{re.escape(run_id)}-T\d+\b")
     for line in text.splitlines():
         if not line.strip().startswith("- [ ]"):
             continue
-        m = re.search(r"\bT-\d+\b", line)
-        ids.append(m.group(0) if m else line.strip()[:40])
+        m = full.search(line)
+        if m:
+            ids.append(m.group(0))
     return ids
 
 
@@ -48,6 +51,7 @@ def main() -> int:
     parser.add_argument("--run-id", required=True, help="S1 run id with approved spec")
     parser.add_argument("--stream", action="store_true")
     parser.add_argument("--skip-agents", action="store_true")
+    parser.add_argument("--no-continue", action="store_true", help="Do not start S3 after plan approval")
     args = parser.parse_args()
 
     dirs = ensure_run_dirs(args.run_id)
@@ -71,8 +75,8 @@ def main() -> int:
     cfg = load_workflow()
     loop_cfg = loop_config_from_workflow(cfg, "plan", skip_agents=args.skip_agents, stream=args.stream)
     human_plan = bool((cfg.get("gates") or {}).get("human_gate_plan", False))
-    model_a = slot_model(cfg, "A")
-    model_b = slot_model(cfg, "B")
+    model_a = slot_model(cfg, "A", stage="plan")
+    model_b = slot_model(cfg, "B", stage="plan")
 
     write_state(
         dirs["run"],
@@ -85,14 +89,15 @@ def main() -> int:
         "SPEC_PATH": str(spec_path.relative_to(ROOT)),
         "PLAN_PATH": str(plan_path.relative_to(ROOT)),
         "MAX_ROUNDS": str(loop_cfg.max_rounds),
+        "TASK_PREFIX": args.run_id,
     }
     print(f"run_id={args.run_id} plan max_rounds={loop_cfg.max_rounds}")
 
     write_prompt = render(load_prompt("03-plan-write.md"), mapping)
     if args.skip_agents:
         plan_path.write_text(
-            "- [ ] T-01 stub; AC-01; files=a; deps=[]; DoD=x\n"
-            "- [ ] T-02 stub; AC-02; files=b; deps=[T-01]; DoD=y\n",
+            f"- [ ] {args.run_id}-T01 stub; AC-01; files=a; deps=[]; DoD=x\n"
+            f"- [ ] {args.run_id}-T02 stub; AC-02; files=b; deps=[{args.run_id}-T01]; DoD=y\n",
             encoding="utf-8",
         )
     else:
@@ -110,7 +115,7 @@ def main() -> int:
     if not plan_path.is_file():
         print("FAIL: plan.md missing", file=sys.stderr)
         return 1
-    ids = checkbox_ids(plan_path.read_text(encoding="utf-8"))
+    ids = checkbox_ids(plan_path.read_text(encoding="utf-8"), args.run_id)
     print(f"tasks: {ids}")
     if len(ids) < 2:
         write_state(dirs["run"], status="failed", error="plan-fewer-than-2-tasks")
@@ -189,6 +194,37 @@ def main() -> int:
         encoding="utf-8",
     )
     print(f"S2 complete. evidence={evidence}")
+    from gh_collab import stage_complete
+    from stage_labels import labels_cfg
+
+    stage_complete(
+        args.run_id,
+        labels_cfg()["spec_approved"],
+        delivered="Plan reviewed and ready",
+        next_step="`/approve` to write acceptance tests",
+    )
+    if args.no_continue or args.skip_agents:
+        print("S3 not started")
+        return 0
+    already = subprocess.run(
+        ["pgrep", "-fl", f"s3_acceptance_loop.py --run-id {args.run_id}"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if already.returncode == 0 and already.stdout.strip():
+        print("S3 already running")
+        return 0
+    log = dirs["run"] / "s3-acceptance.log"
+    proc = subprocess.Popen(
+        [sys.executable, str(ROOT / "scripts" / "s3_acceptance_loop.py"), "--run-id", args.run_id, "--stream"],
+        cwd=ROOT,
+        stdout=log.open("a", encoding="utf-8"),
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    write_state(dirs["run"], status="acceptance_started", s3_pid=proc.pid)
+    print(f"S3 started pid={proc.pid} log={log}")
     return 0
 
 
