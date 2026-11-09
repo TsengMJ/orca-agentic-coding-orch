@@ -1,0 +1,58 @@
+# Single source of truth for AAC × Orca practice runs.
+# Change models / gates / human checkpoints here — do not hardcode in prompts.
+# Optional env overrides (highest precedence):
+#   AAC_SLOT_A_MODEL, AAC_SLOT_B_MODEL, AAC_SLOT_I_MODEL
+#   AAC_GATE_CMD, AAC_BUILD_GATE_CMD, AAC_MAX_ROUNDS
+#   AAC_AGENT_CALL_RETRIES, AAC_AGENT_TIMEOUT_SEC, AAC_NOTIFY_CMD
+#   AAC_HUMAN_GATE, AAC_HUMAN_GATE_PLAN, AAC_OPEN_PR  (1/0, true/false)
+
+schema: 1
+
+slots:
+  A:
+    runtime: cursor
+    model: grok-4.7-high
+    args: []
+  B:
+    runtime: cursor
+    model: composer-2.5
+    args: []
+  # null = inherit owner (roles.owner → slot A by default)
+  I: null
+
+roles:
+  owner: A
+  reviewer: B
+  # Role pack used when composing stage prompts
+  pack: memory/roles
+
+gates:
+  human_gate: true
+  human_gate_plan: false
+  # AAC: bounds every review loop AND later command-gate repairs. Exhaust → abort + notify.
+  max_rounds: 3
+  # Same-call retries after timeout/nonzero (gate_loop-style repair), then abort.
+  agent_call_retries: 2
+  agent_timeout_sec: 480
+  # Optional: sh -c '<notify_cmd> "$1"' with message as $1
+  notify_cmd: ""
+  # Run from repo root; dogfood is the default GATE target for S0+
+  gate_cmd: "uv run --project fixtures/dogfood --group dev pytest -q"
+  build_gate_cmd: ""
+  open_pr: false
+
+modes:
+  dual_spec: false
+  phases: false
+
+orca:
+  agent_hooks: required
+  worktree_name_prefix: aac-
+  keep_open_implement: true
+
+paths:
+  aac_root: aac
+  prompts_dir: prompts
+  artifacts_dir: artifacts/runs
+  merge_policy: memory/roles/contracts/merge-policy.yaml
+  review_contract: memory/roles/contracts/review-output.md

@@ -1,0 +1,43 @@
+schema: 1
+max_review_rounds: 3
+max_gate_repairs: 3
+risk_policy:
+  low: auto_merge_if_all_required_gates_pass
+  medium: manual_approval
+  high: manual_approval
+high_risk_paths_or_domains:
+  - orchestrator
+  - lease
+  - scheduler
+  - authorization
+  - payments
+  - database_migration
+  - smart_contract_custody
+required_checks:
+  - spec_approved
+  - protected_tests_unchanged
+  - build_pass
+  - unit_pass
+  - integration_pass
+  - acceptance_pass
+  - regression_pass
+  - no_unresolved_blockers
+  - review_head_matches_merge_head
+  - qa_head_matches_merge_head
+  - test_artifacts_present
+  - no_missing_required_gate
+optional_by_risk:
+  high:
+    - security_review
+    - fault_injection
+    - human_approval
+  medium:
+    - human_approval
+block_on:
+  - flaky_or_missing_required_test
+  - invalid_review_verdict
+  - merge_head_changed_after_review
+  - unresolved_spec_dispute
+  - CI_bypassed_or_disabled
+  - protected_test_modified
+  - review_loop_exhausted
