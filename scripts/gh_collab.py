@@ -236,15 +236,12 @@ def relocate_run(run_id: str, final_id: str) -> None:
 
 
 def latest_human_command(comments: list[dict]) -> str | None:
-    """Last /approve or /abort from a comment that is not an orchestrator note."""
+    """Last /approve or /abort from a human command comment."""
     found: str | None = None
     for comment in comments:
-        body = (comment.get("body") or "").strip()
-        if ORCH_MARKER in body:
-            continue
-        first = body.splitlines()[0].strip().lower() if body else ""
-        if first in {"/approve", "/abort"}:
-            found = first
+        kind = classify_body(comment.get("body") or "")
+        if kind in {"/approve", "/abort"}:
+            found = kind
     return found
 
 
@@ -378,15 +375,20 @@ def check(issue: int) -> None:
 
 
 def classify_body(body: str) -> str | None:
-    """approve, abort, feedback, or None when the comment is empty or ours."""
-    if ORCH_MARKER in (body or ""):
-        return None
+    """approve, abort, feedback, or None when the comment is empty or ours.
+
+    First-line `/approve` or `/abort` always wins — even if the body also carries
+    the orch marker (self-drive historically appended the marker and stalled).
+    Other orch-marked notes stay ignored so stage acks never become feedback.
+    """
     text = (body or "").strip()
     if not text:
         return None
     first = text.splitlines()[0].strip().lower()
     if first in {"/approve", "/abort"}:
         return first
+    if ORCH_MARKER in text:
+        return None
     return "feedback"
 
 

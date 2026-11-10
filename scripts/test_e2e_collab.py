@@ -68,6 +68,7 @@ class EndToEndCollabTest(unittest.TestCase):
     def test_comments_drive_every_stage(self) -> None:
         self.assertIsNone(classify_body("<!-- aac-orchestrator -->\n/approve"))
         self.assertEqual(classify_body("/approve\n"), "/approve")
+        self.assertEqual(classify_body("/approve\n\n<!-- aac-orchestrator -->"), "/approve")
         self.assertEqual(classify_body("Please split the first task."), "feedback")
 
         comments = [

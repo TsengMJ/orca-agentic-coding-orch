@@ -23,7 +23,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from aac_common import ROOT, load_workflow, write_state
+from aac_common import ROOT, load_workflow, spawn_uv_script, write_state
 from gh_collab import (
     branch_name,
     ensure_workflow_labels,
@@ -221,26 +221,21 @@ def start_issue_job(issue: int, registry: JobRegistry) -> None:
     request = issue_request_text(issue)
     log = run_dir / "server-s1.log"
     run_dir.mkdir(parents=True, exist_ok=True)
-    cmd = [
-        sys.executable,
-        str(ROOT / "scripts" / "s1_spec_loop.py"),
-        "--issue",
-        str(issue),
-        "--run-id",
-        run_id,
-        "--request",
-        request,
-        "--stream",
-    ]
     # Artifacts stay on orchestrator ROOT. The Orca worktree is for git checkout during publish.
     # S1 exits 0 at awaiting_human_gate after review approval; then we publish the draft PR.
-    proc = subprocess.Popen(
-        cmd,
-        cwd=str(ROOT),
-        stdout=log.open("a", encoding="utf-8"),
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
-        text=True,
+    # Use uv run so the job outlives ephemeral uv build interpreters.
+    proc = spawn_uv_script(
+        "s1_spec_loop.py",
+        [
+            "--issue",
+            str(issue),
+            "--run-id",
+            run_id,
+            "--request",
+            request,
+            "--stream",
+        ],
+        log=log,
     )
     (run_dir / "job.pid").write_text(f"{proc.pid}\n", encoding="utf-8")
     write_state(

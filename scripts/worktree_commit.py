@@ -75,7 +75,9 @@ def commit_paths(run_id: str, paths: list[str], message: str) -> None:
         dest = work / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(src.read_bytes())
-        git(["add", "--", rel], cwd=work)
+        # Explicit path lists may include gitignored orch docs (aac/docs/*);
+        # force-add so S3 matrices / published specs still land on the branch.
+        git(["add", "-f", "--", rel], cwd=work)
     status = subprocess.run(["git", "status", "--porcelain"], cwd=work, text=True, capture_output=True, check=False)
     if not status.stdout.strip():
         print(f"nothing to commit on {branch}")

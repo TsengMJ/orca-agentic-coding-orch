@@ -72,7 +72,7 @@ class LocalCommitTest(unittest.TestCase):
                     "Implement T02.",
                 )
 
-            self.assertTrue(any(c[:1] == ["add"] for c in calls))
+            self.assertTrue(any(c[:2] == ["add", "-f"] for c in calls))
             self.assertTrue(any(c[:1] == ["commit"] for c in calls))
             self.assertFalse(any(c and c[0] == "push" for c in calls))
 

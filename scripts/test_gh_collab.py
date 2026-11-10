@@ -13,12 +13,27 @@ from stage_labels import approved_label, next_waiting, tech_lead_note, waiting_l
 class CommentParseTest(unittest.TestCase):
     def test_ignores_orchestrator_and_keeps_latest_human(self) -> None:
         comments = [
-            {"body": f"/approve\n\n{ORCH_MARKER}"},
+            {"body": f"**Spec done.**\n\n{ORCH_MARKER}"},
             {"body": "/abort"},
             {"body": "looks good\n/approve"},
             {"body": "/approve"},
         ]
         self.assertEqual(latest_human_command(comments), "/approve")
+
+    def test_approve_with_trailing_orch_marker_counts(self) -> None:
+        """Self-drive used to append the orch marker and stall the gate."""
+        from gh_collab import classify_body
+
+        body = f"/approve\n\n{ORCH_MARKER}"
+        self.assertEqual(classify_body(body), "/approve")
+        self.assertEqual(latest_human_command([{"body": body}]), "/approve")
+
+    def test_orch_note_with_marker_first_is_ignored(self) -> None:
+        from gh_collab import classify_body
+
+        body = f"{ORCH_MARKER}\n/approve"
+        self.assertIsNone(classify_body(body))
+        self.assertIsNone(latest_human_command([{"body": body}]))
 
     def test_abort_wins_when_latest(self) -> None:
         comments = [{"body": "/approve"}, {"body": "/abort\nstop"}]
