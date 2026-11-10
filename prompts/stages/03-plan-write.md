@@ -18,7 +18,8 @@ Turn the approved spec into `plan.md`: a checkbox task list. One task = one comm
 Rules:
 
 - At least **two** tasks, each a markdown checkbox line starting with `- [ ]`.
-- Each task line includes: task id (`T-01`…), AC ids it covers, files it may touch, deps, and a one-line DoD.
+- Each task line includes: task id (`{{TASK_PREFIX}}-T01`, `{{TASK_PREFIX}}-T02`, …), AC ids it covers, files it may touch, deps, and a one-line DoD.
+- Dependencies must use those full task ids.
 - Cover every AC in the spec at least once across tasks.
 - Keep scope inside `fixtures/dogfood` unless the spec says otherwise.
 - Do not edit `{{SPEC_PATH}}`.
@@ -28,11 +29,11 @@ Example shape:
 ```markdown
 ## Phase 1
 Acceptance: existing ping stays green
-- [ ] T-01 Add characterization note for ping; AC-…; files=fixtures/dogfood/tests/test_smoke.py; deps=[]; DoD=pytest still passes ping
+- [ ] {{TASK_PREFIX}}-T01 Add characterization note for ping; AC-…; files=fixtures/dogfood/tests/test_smoke.py; deps=[]; DoD=pytest still passes ping
 
 ## Phase 2
 Acceptance: new behavior ACs
-- [ ] T-02 Implement the feature; AC-…; files=fixtures/dogfood/src/dogfood/__init__.py; deps=[T-01]; DoD=behavior matches spec
+- [ ] {{TASK_PREFIX}}-T02 Implement the feature; AC-…; files=fixtures/dogfood/src/dogfood/__init__.py; deps=[{{TASK_PREFIX}}-T01]; DoD=behavior matches spec
 ```
 
 ## Done when

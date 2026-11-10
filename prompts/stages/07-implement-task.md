@@ -1,7 +1,18 @@
-# Stage stub — Implement one task (S4+)
+# Implement one task (I)
 
-> Stub. Full contract lands in S4.
+You are the implementer (slot I). Follow `memory/roles/roles/06-coding-agent.md`.
 
-**Slot**: implementer (I, default A)  
-**Role file**: `memory/roles/roles/06-coding-agent.md`  
-Forbidden: edit protected acceptance tests.
+## Task
+
+- Id: `{{TASK_ID}}`
+- Line: {{TASK_LINE}}
+- Spec: `{{SPEC_PATH}}`
+- Plan: `{{PLAN_PATH}}`
+
+## Rules
+
+Edit only the files named on the task line. Do not edit acceptance tests, `protected-tests.json`, or workflow scripts. A new acceptance test may still fail; do not weaken it.
+
+## Done when
+
+The task's definition of done holds for the code you can complete in this step. Print `implemented {{TASK_ID}}` and stop.

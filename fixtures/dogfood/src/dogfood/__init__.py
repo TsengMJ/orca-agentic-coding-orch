@@ -8,6 +8,10 @@ def ping() -> str:
 
 
 def add(a: int, b: int) -> int:
+    if not isinstance(a, int):
+        raise TypeError
+    if not isinstance(b, int):
+        raise TypeError
     return int.__add__(a, b)
 
 

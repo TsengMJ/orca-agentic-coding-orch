@@ -107,6 +107,7 @@ aac/
 - [Code Reviewer](roles/07-code-reviewer.md)
 - [Runtime QA](roles/08-runtime-qa.md)
 - [Security Reviewer](roles/09-security-reviewer.md)
+- [Workflow Healer](roles/10-workflow-healer.md)（sidecar；非產品作者）
 - [Review schema](contracts/review-output.md)
 - [Merge policy](contracts/merge-policy.yaml)
 

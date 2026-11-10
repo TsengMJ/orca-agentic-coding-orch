@@ -63,7 +63,26 @@ def apply_env_overrides(cfg: dict) -> dict:
     return cfg
 
 
-def resolve_slot(cfg: dict, name: str) -> dict:
+def stage_model_override(cfg: dict, name: str, stage: str | None) -> str | None:
+    """Return stage_models[stage][slot] when set."""
+    if not stage:
+        return None
+    name = name.upper()
+    stages = cfg.get("stage_models") or {}
+    row = stages.get(stage) or {}
+    if not isinstance(row, dict):
+        return None
+    value = row.get(name)
+    if value is None and name == "I":
+        # Implementer may fall back to the owner's stage model.
+        owner = str((cfg.get("roles") or {}).get("owner") or "A").upper()
+        value = row.get(owner)
+    if value is None or str(value).strip() == "":
+        return None
+    return str(value).strip()
+
+
+def resolve_slot(cfg: dict, name: str, stage: str | None = None) -> dict:
     name = name.upper()
     if name not in {"A", "B", "I"}:
         raise SystemExit(f"slot must be A, B, or I (got {name})")
@@ -82,12 +101,14 @@ def resolve_slot(cfg: dict, name: str) -> dict:
     if not isinstance(raw, dict):
         raise SystemExit(f"slot {name} is not configured")
 
+    model = stage_model_override(cfg, name, stage) or raw.get("model")
     out = {
         "slot": name,
         "runtime": raw.get("runtime") or "cursor",
-        "model": raw.get("model"),
+        "model": model,
         "args": list(raw.get("args") or []),
         "inherited_from": inherited_from,
+        "stage": stage,
         "owner": str(roles.get("owner") or "A").upper(),
         "reviewer": str(roles.get("reviewer") or "B").upper(),
     }
@@ -106,6 +127,11 @@ def main() -> int:
         help="path to workflow.yaml",
     )
     parser.add_argument(
+        "--stage",
+        default="",
+        help="optional stage key from stage_models (spec|plan|acceptance|implement|gate|final)",
+    )
+    parser.add_argument(
         "--field",
         choices=("runtime", "model", "args", "json", "all"),
         default="all",
@@ -114,7 +140,7 @@ def main() -> int:
     args = parser.parse_args()
 
     cfg = apply_env_overrides(load_config(args.config))
-    resolved = resolve_slot(cfg, args.slot)
+    resolved = resolve_slot(cfg, args.slot, stage=args.stage or None)
 
     if args.field == "json":
         print(json.dumps(resolved, indent=2))
@@ -126,7 +152,8 @@ def main() -> int:
         print(json.dumps(resolved["args"]))
     else:
         inherit = f" (inherit {resolved['inherited_from']})" if resolved["inherited_from"] else ""
-        print(f"{resolved['slot']}{inherit}: {resolved['runtime']} / {resolved['model']}")
+        stage = f" stage={resolved['stage']}" if resolved.get("stage") else ""
+        print(f"{resolved['slot']}{inherit}{stage}: {resolved['runtime']} / {resolved['model']}")
     return 0
 
 

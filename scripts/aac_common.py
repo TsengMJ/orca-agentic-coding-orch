@@ -10,7 +10,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+_DEFAULT_ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ["AAC_ROOT"]).resolve() if os.environ.get("AAC_ROOT") else _DEFAULT_ROOT
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
@@ -255,8 +256,8 @@ def load_workflow() -> dict:
     return apply_env_overrides(load_config(DEFAULT_CONFIG))
 
 
-def slot_model(cfg: dict, name: str) -> str:
-    return resolve_slot(cfg, name)["model"]
+def slot_model(cfg: dict, name: str, stage: str | None = None) -> str:
+    return resolve_slot(cfg, name, stage=stage)["model"]
 
 
 def notify_human(message: str, *, title: str = "AAC") -> None:

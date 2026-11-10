@@ -9,6 +9,7 @@ fixtures/dogfood/.venv/
 
 # AAC run state (keep docs placeholder; ignore live runs)
 aac/.run/
+aac/.worktrees/
 aac/docs/*
 !aac/docs/.gitkeep
 

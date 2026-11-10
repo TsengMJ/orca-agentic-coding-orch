@@ -21,6 +21,8 @@ from aac_common import (
     utc_run_id,
     write_state,
 )
+from gh_collab import branch_name, repo
+from ids import issue_run_id
 from review_loop import (
     LoopPaths,
     call_agent_with_repair,
@@ -44,6 +46,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--request", required=True)
     parser.add_argument("--run-id", default="")
+    parser.add_argument(
+        "--issue",
+        type=int,
+        default=0,
+        help="GitHub issue number. run_id follows feature/<slug> or fix/<slug> until the draft PR exists.",
+    )
     parser.add_argument("--auto-approve-human-gate", action="store_true")
     parser.add_argument("--skip-agents", action="store_true")
     parser.add_argument(
@@ -58,23 +66,35 @@ def main() -> int:
         cfg, "spec", skip_agents=args.skip_agents, stream=args.stream
     )
     human_gate = bool((cfg.get("gates") or {}).get("human_gate", True))
-    model_a = slot_model(cfg, "A")
-    model_b = slot_model(cfg, "B")
+    model_a = slot_model(cfg, "A", stage="spec")
+    model_b = slot_model(cfg, "B", stage="spec")
 
-    run_id = args.run_id or utc_run_id("s1")
+    if args.issue and args.run_id:
+        raise SystemExit("pass only one of --issue or --run-id")
+    run_id = args.run_id or (issue_run_id(repo(), args.issue) if args.issue else utc_run_id("s1"))
     dirs = ensure_run_dirs(run_id)
     spec_path = dirs["docs"] / "spec.md"
+    branch = branch_name(args.issue) if args.issue else None
     write_state(
         dirs["run"],
         run_id=run_id,
         stage="spec",
         status="running",
         request=args.request,
+        issue=args.issue or None,
+        branch=branch,
         models={"A": model_a, "B": model_b},
         max_rounds=loop_cfg.max_rounds,
         agent_call_retries=loop_cfg.agent_call_retries,
         human_gate=human_gate,
     )
+    if args.issue and branch:
+        from gh_collab import write_github_meta
+
+        write_github_meta(
+            run_id,
+            {"issue": args.issue, "branch": branch, "run_id": run_id, "pr": None, "url": None},
+        )
 
     mapping_base = {
         "REQUEST": args.request,
