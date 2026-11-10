@@ -15,6 +15,12 @@ def add(a: int, b: int) -> int:
     return int.__add__(a, b)
 
 
+def twice(n: int) -> int:
+    if not isinstance(n, int):
+        raise TypeError
+    return int.__mul__(n, 2)
+
+
 def echo_id(s: str) -> str:
     return s
 
