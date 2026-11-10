@@ -35,4 +35,5 @@ This keeps self-iteration and dogfood synchronized for the next run.
 - Plan human gate CLI (`plan-human-gate.md` / `s2_human_gate.py`); dogfooded approve.
 - E2E merge no longer calls `gh` before stub (`e2e-merge-before-gh.md`).
 - Landed orch+dogfood batch on `origin/dev` at `4f94278`; `goal` fast-forwarded to match.
-- Open follow-ups: `gh`-backed Issue→PR `/approve` against a real draft; workflow_server live cron. Keep landing future batches on `origin/dev` and refreshing `goal`.
+- Collaboration invariants locked in: cron signals, stage-end PR updates (incl. failure), product-repo PRs (`collab-invariants.md`).
+- Open follow-ups: `gh auth login` then live Issue→PR `/approve` dogfood; workflow_server cron against a real draft. Keep landing batches on `origin/dev`.

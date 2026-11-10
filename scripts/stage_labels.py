@@ -120,11 +120,16 @@ def next_waiting(approved: str) -> str | None:
     return mapping[approved]
 
 
-def tech_lead_note(*, stage: str, delivered: str, next_step: str) -> str:
-    """Short Tech Lead voice for a PR comment body (caller adds marker)."""
+def tech_lead_note(*, stage: str, delivered: str, next_step: str, outcome: str = "done") -> str:
+    """Short Tech Lead voice for a PR comment body (caller adds marker).
+
+    `outcome` is usually `done`, `failed`, or `aborted` — every stage end must
+    leave a note on the product PR, including failures.
+    """
+    word = (outcome or "done").strip() or "done"
     return "\n".join(
         [
-            f"**{stage} done.**",
+            f"**{stage} {word}.**",
             delivered.rstrip("."),
             f"Next: {next_step.rstrip('.')}.",
         ]

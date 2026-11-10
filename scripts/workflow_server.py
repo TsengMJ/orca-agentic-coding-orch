@@ -262,6 +262,7 @@ def start_issue_job(issue: int, registry: JobRegistry) -> None:
             "run_id": run_id,
             "pr": None,
             "url": None,
+            "repo": repo(),
             "worktree": str(worktree),
         },
     )
@@ -276,10 +277,18 @@ def start_issue_job(issue: int, registry: JobRegistry) -> None:
 
 
 def _finish_issue_job(issue: int, run_id: str, worktree: Path, proc: subprocess.Popen[str]) -> None:
+    from gh_collab import stage_failed
+
     code = proc.wait()
     run_dir = ROOT / "aac" / ".run" / run_id
     if code != 0:
         write_state(run_dir, status="aborted_agent_failure", error=f"s1-exit-{code}")
+        stage_failed(
+            run_id,
+            stage="Spec",
+            error=f"S1 exited {code} before publish",
+            next_step="Healer may resume, or fix and re-label Ready",
+        )
         print(f"S1 failed for #{issue} exit={code}")
         return
     try:
@@ -301,7 +310,14 @@ def _finish_issue_job(issue: int, run_id: str, worktree: Path, proc: subprocess.
             check=False,
         )
         if result.returncode != 0:
-            write_state(run_dir, status="publish_failed", error=(result.stderr or result.stdout)[:500])
+            err = (result.stderr or result.stdout or "")[:500]
+            write_state(run_dir, status="publish_failed", error=err)
+            stage_failed(
+                run_id,
+                stage="Spec",
+                error=f"publish failed: {err.strip() or 'unknown'}",
+                next_step="Healer publish_retry or human publish",
+            )
             print(f"publish failed for #{issue}: {(result.stderr or result.stdout).strip()}")
             return
         print(result.stdout)
@@ -309,6 +325,12 @@ def _finish_issue_job(issue: int, run_id: str, worktree: Path, proc: subprocess.
         print(f"published #{issue}; waiting for /approve on Spec")
     except Exception as exc:  # noqa: BLE001
         write_state(run_dir, status="publish_failed", error=str(exc))
+        stage_failed(
+            run_id,
+            stage="Spec",
+            error=f"publish error: {exc}",
+            next_step="Healer publish_retry or human publish",
+        )
         print(f"publish error for #{issue}: {exc}")
 
 

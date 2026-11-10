@@ -63,11 +63,25 @@ def main() -> int:
             )
             if result.returncode != 0:
                 write_state(dirs["run"], status="aborted_agent_failure")
+                from gh_collab import stage_failed
+
+                stage_failed(
+                    args.run_id,
+                    stage="Gate",
+                    error=f"implement remaining task failed rc={result.returncode}",
+                )
                 return result.returncode or 1
         problems = check(args.run_id)
         if problems:
             print(f"FAIL protected tests: {problems}", file=sys.stderr)
             write_state(dirs["run"], status="failed", error="protected-tests-changed")
+            from gh_collab import stage_failed
+
+            stage_failed(
+                args.run_id,
+                stage="Gate",
+                error="protected acceptance tests were modified",
+            )
             return 2
         plan_path.write_text(mark_done(plan_path.read_text(encoding="utf-8"), args.run_id, task["id"]), encoding="utf-8")
         if not args.skip_commit:
@@ -82,6 +96,9 @@ def main() -> int:
         if ran.returncode != 0:
             write_state(dirs["run"], status="failed", error="gate-cmd")
             print("FAIL gate_cmd", file=sys.stderr)
+            from gh_collab import stage_failed
+
+            stage_failed(args.run_id, stage="Gate", error="gate_cmd failed")
             return ran.returncode or 1
         print("gate_cmd passed")
 

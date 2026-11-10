@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -49,7 +50,21 @@ def run(cmd: list[str], *, check: bool = True, cwd: Path | None = None) -> subpr
     return result
 
 
-def repo() -> str:
+def repo(run_id: str | None = None) -> str:
+    """Product repo for Issues/PRs — not necessarily the orch checkout.
+
+    Resolution order: run github.json `repo` → `AAC_GITHUB_REPO` → config `github.repo`.
+    PRs must open in the project under development, never silently default away from
+    an explicit per-run/product setting.
+    """
+    if run_id:
+        meta = load_github_meta(run_id)
+        configured = str(meta.get("repo") or "").strip()
+        if configured:
+            return configured
+    env = os.environ.get("AAC_GITHUB_REPO", "").strip()
+    if env:
+        return env
     return str(gh_cfg().get("repo") or "TsengMJ/orca-agentic-coding-orch")
 
 
@@ -81,13 +96,13 @@ def branch_name(issue: int) -> str:
     return branch_from_title(kind, title)
 
 
-def ensure_label(name: str) -> None:
+def ensure_label(name: str, *, run_id: str | None = None) -> None:
     color = LABEL_COLORS.get(name, "ededed")
     desc = LABEL_DESCRIPTIONS.get(name, name)
     run(
         [
             "gh", "label", "create", name,
-            "--repo", repo(),
+            "--repo", repo(run_id),
             "--color", color,
             "--description", desc,
             "--force",
@@ -96,14 +111,14 @@ def ensure_label(name: str) -> None:
     )
 
 
-def ensure_workflow_labels() -> None:
+def ensure_workflow_labels(*, run_id: str | None = None) -> None:
     for name in sorted(all_workflow_labels()):
-        ensure_label(name)
+        ensure_label(name, run_id=run_id)
 
 
-def pr_label_names(pr: int) -> set[str]:
+def pr_label_names(pr: int, *, run_id: str | None = None) -> set[str]:
     viewed = run(
-        ["gh", "pr", "view", str(pr), "--repo", repo(), "--json", "labels"],
+        ["gh", "pr", "view", str(pr), "--repo", repo(run_id), "--json", "labels"],
         check=False,
     )
     if viewed.returncode != 0:
@@ -112,33 +127,84 @@ def pr_label_names(pr: int) -> set[str]:
     return {label.get("name", "") for label in data.get("labels") or []}
 
 
-def set_exclusive_pr_label(pr: int, label: str) -> None:
+def set_exclusive_pr_label(pr: int, label: str, *, run_id: str | None = None) -> None:
     """Keep exactly one workflow label on the PR."""
-    ensure_label(label)
-    current = pr_label_names(pr)
+    ensure_label(label, run_id=run_id)
+    current = pr_label_names(pr, run_id=run_id)
     for name in sorted(current & all_workflow_labels()):
         if name != label:
             run(
-                ["gh", "pr", "edit", str(pr), "--repo", repo(), "--remove-label", name],
+                ["gh", "pr", "edit", str(pr), "--repo", repo(run_id), "--remove-label", name],
                 check=False,
             )
     if label not in current:
-        run(["gh", "pr", "edit", str(pr), "--repo", repo(), "--add-label", label], check=False)
+        run(
+            ["gh", "pr", "edit", str(pr), "--repo", repo(run_id), "--add-label", label],
+            check=False,
+        )
 
 
-def issue_remove_label(issue: int, label: str) -> None:
+def issue_remove_label(issue: int, label: str, *, run_id: str | None = None) -> None:
     run(
-        ["gh", "issue", "edit", str(issue), "--repo", repo(), "--remove-label", label],
+        [
+            "gh", "issue", "edit", str(issue),
+            "--repo", repo(run_id),
+            "--remove-label", label,
+        ],
         check=False,
     )
 
 
-def post_pr_comment(pr: int, body: str) -> None:
+def post_pr_comment(pr: int, body: str, *, run_id: str | None = None) -> None:
     text = body.rstrip() + "\n\n" + ORCH_MARKER
     run(
-        ["gh", "pr", "comment", str(pr), "--repo", repo(), "--body", text],
+        ["gh", "pr", "comment", str(pr), "--repo", repo(run_id), "--body", text],
         check=False,
     )
+
+
+def post_issue_comment(issue: int, body: str, *, run_id: str | None = None) -> None:
+    text = body.rstrip() + "\n\n" + ORCH_MARKER
+    run(
+        [
+            "gh", "issue", "comment", str(issue),
+            "--repo", repo(run_id),
+            "--body", text,
+        ],
+        check=False,
+    )
+
+
+def report_stage(
+    run_id: str,
+    *,
+    stage: str,
+    delivered: str,
+    next_step: str,
+    outcome: str = "done",
+    label: str | None = None,
+) -> None:
+    """Always update the product Issue/PR when a stage ends — success or failure.
+
+    Prefer the draft PR once it exists; otherwise comment on the Issue so cron
+    progress is still visible before publish.
+    """
+    meta = load_github_meta(run_id)
+    if label:
+        meta["label"] = label
+        write_github_meta(run_id, meta)
+    note = tech_lead_note(stage=stage, delivered=delivered, next_step=next_step, outcome=outcome)
+    if os.environ.get("AAC_E2E_SKIP", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return
+    pr = meta.get("pr")
+    if pr:
+        if label:
+            set_exclusive_pr_label(int(pr), label, run_id=run_id)
+        post_pr_comment(int(pr), note, run_id=run_id)
+        return
+    issue = meta.get("issue")
+    if issue:
+        post_issue_comment(int(issue), note, run_id=run_id)
 
 
 def relocate_run(run_id: str, final_id: str) -> None:
@@ -258,6 +324,7 @@ def publish(issue: int, run_id: str, *, cwd: Path | None = None) -> str:
             "run_id": final_id,
             "url": pr_url,
             "label": cfg["spec"],
+            "repo": prev.get("repo") or repo(run_id),
             "worktree": prev.get("worktree") or (str(work) if work != ROOT else None),
         },
     )
@@ -417,21 +484,30 @@ def merge_pr(pr: int, run_id: str) -> tuple[int, str]:
 
 
 def stage_complete(run_id: str, approved: str, *, delivered: str, next_step: str) -> None:
-    """After a stage finishes: swap *_Approved → next waiting label and post TL note."""
-    meta = load_github_meta(run_id)
-    pr = meta.get("pr")
-    if not pr:
-        return
+    """After a stage succeeds: swap *_Approved → next waiting label and post TL note."""
     nxt = next_waiting(approved)
     if nxt is None:
         return
-    meta["label"] = nxt
-    write_github_meta(run_id, meta)
     stage = approved.removesuffix("_Approved")
-    if __import__("os").environ.get("AAC_E2E_SKIP", "").strip() in {"1", "true", "yes"}:
-        return
-    set_exclusive_pr_label(int(pr), nxt)
-    post_pr_comment(int(pr), tech_lead_note(stage=stage, delivered=delivered, next_step=next_step))
+    report_stage(
+        run_id,
+        stage=stage,
+        delivered=delivered,
+        next_step=next_step,
+        outcome="done",
+        label=nxt,
+    )
+
+
+def stage_failed(run_id: str, *, stage: str, error: str, next_step: str = "Healer or human will resume") -> None:
+    """Stage ended in failure/abort — still update the product Issue/PR."""
+    report_stage(
+        run_id,
+        stage=stage,
+        delivered=error,
+        next_step=next_step,
+        outcome="failed",
+    )
 
 
 def apply_comments(run_id: str, comments: list[dict], seen: set[str], *, pr: int | None = None) -> list[str]:
@@ -486,7 +562,7 @@ def apply_comments(run_id: str, comments: list[dict], seen: set[str], *, pr: int
                     meta["label"] = approved
                     write_github_meta(run_id, meta)
                     if not e2e:
-                        set_exclusive_pr_label(pr_number, approved)
+                        set_exclusive_pr_label(pr_number, approved, run_id=run_id)
             code, message = continue_run(run_id, pr=pr_number or None)
         else:
             code, message = feedback_run(run_id, comment.get("body") or "")
@@ -534,7 +610,7 @@ def watch_once() -> int:
                 failures += 1
             # Tech Lead notes are posted by stage helpers; keep a short orch ack for apply result.
             if message.startswith("failed") or message.startswith("merged") or message == "aborted":
-                post_pr_comment(int(pr["number"]), message)
+                post_pr_comment(int(pr["number"]), message, run_id=run_id)
     return 1 if failures else 0
 
 

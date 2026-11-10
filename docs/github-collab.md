@@ -7,6 +7,8 @@ Default only. Several issues in one PR is not implemented.
 - Issue `#N` is the request. Label it `Ready` to enqueue S1.
 - Branch is `feature/<slug>` or `fix/<slug>` (bug label or a `fix:` title selects `fix`).
 - The draft PR targets `dev`. Merge is into `dev`, not `master`.
+- **Product repo** is `github.repo` / `AAC_GITHUB_REPO` / per-run `github.json.repo`. Issues and PRs open there — not automatically on the orch tooling checkout when you are developing another project.
+- **Every stage end** (success or failure) posts a Tech Lead note on the PR (or the Issue before publish). Cron reads `Ready` on issues and waiting labels + `/approve`/`/abort`/feedback on PRs to advance.
 - Before the PR exists, `run_id` is `{repo}-issue-{N}` (repo slash → `-`).
 - After `publish`, `run_id` is `{repo}-pr-{pr}`. Task ids append `-T01`, `-T02`, and so on.
 - Branch is stored in `aac/.run/<run_id>/github.json`, not in the run id.

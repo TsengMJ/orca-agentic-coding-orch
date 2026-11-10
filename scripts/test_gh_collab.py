@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
+import json
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
-from gh_collab import latest_human_command, ORCH_MARKER
+from gh_collab import latest_human_command, ORCH_MARKER, report_stage, repo
 from ids import branch_name, issue_run_id, parse_run_id, pr_run_id, task_id
 from stage_labels import approved_label, next_waiting, tech_lead_note, waiting_labels
 
@@ -57,6 +61,61 @@ class StageLabelTest(unittest.TestCase):
         self.assertNotIn("please", note.lower())
         self.assertNotIn("thank", note.lower())
         self.assertLessEqual(len(note.splitlines()), 3)
+
+    def test_tech_lead_note_failure_outcome(self) -> None:
+        note = tech_lead_note(
+            stage="Spec",
+            delivered="agent timeout",
+            next_step="resume",
+            outcome="failed",
+        )
+        self.assertTrue(note.startswith("**Spec failed.**"))
+
+
+class ProductRepoTest(unittest.TestCase):
+    def test_repo_prefers_run_meta_over_config(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            run_id = "other-project-pr-1"
+            (root / "aac" / ".run" / run_id).mkdir(parents=True)
+            (root / "aac" / ".run" / run_id / "github.json").write_text(
+                json.dumps({"repo": "Acme/widget", "pr": 1}) + "\n",
+                encoding="utf-8",
+            )
+            with mock.patch("gh_collab.ROOT", root), mock.patch.dict(
+                "os.environ", {"AAC_GITHUB_REPO": "TsengMJ/orca-agentic-coding-orch"}
+            ):
+                self.assertEqual(repo(run_id), "Acme/widget")
+
+    def test_repo_env_overrides_config(self) -> None:
+        with mock.patch.dict("os.environ", {"AAC_GITHUB_REPO": "Acme/other"}):
+            self.assertEqual(repo(), "Acme/other")
+
+    def test_report_stage_failure_comments_issue_when_no_pr(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            run_id = "Acme-other-issue-9"
+            (root / "aac" / ".run" / run_id).mkdir(parents=True)
+            (root / "aac" / ".run" / run_id / "github.json").write_text(
+                json.dumps({"repo": "Acme/other", "issue": 9, "pr": None}) + "\n",
+                encoding="utf-8",
+            )
+            with mock.patch("gh_collab.ROOT", root), mock.patch(
+                "gh_collab.post_issue_comment"
+            ) as post_issue, mock.patch("gh_collab.post_pr_comment") as post_pr, mock.patch.dict(
+                "os.environ", {"AAC_E2E_SKIP": ""}
+            ):
+                report_stage(
+                    run_id,
+                    stage="Spec",
+                    delivered="S1 exited 1",
+                    next_step="resume",
+                    outcome="failed",
+                )
+            post_issue.assert_called_once()
+            post_pr.assert_not_called()
+            body = post_issue.call_args[0][1]
+            self.assertIn("**Spec failed.**", body)
 
 
 if __name__ == "__main__":

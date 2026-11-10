@@ -86,10 +86,13 @@ healer:
   model: null
 
 github:
+  # Product repo for Issues/PRs (override with AAC_GITHUB_REPO or per-run github.json).
+  # When developing another project, point this at THAT repo — PRs must not silently
+  # open on the orch tooling repo.
   repo: TsengMJ/orca-agentic-coding-orch
   base: dev
   # Default collaboration: one Issue, one branch, one draft PR.
-  # Branches are feature/<slug> or fix/<slug>. Pull requests merge into dev.
+  # Branches are feature/<slug> or fix/<slug>. Pull requests merge into base.
   issue_pr: one-to-one
   branch_kinds:
     - feature

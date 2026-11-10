@@ -52,6 +52,13 @@ def main() -> int:
         )
         if result.returncode != 0:
             write_state(dirs["run"], status="aborted_agent_failure")
+            from gh_collab import stage_failed
+
+            stage_failed(
+                args.run_id,
+                stage="Implement",
+                error=f"implement agent failed rc={result.returncode}",
+            )
             return result.returncode or 1
 
     problems = check(args.run_id)
@@ -60,6 +67,13 @@ def main() -> int:
         print("FAIL protected tests changed", file=sys.stderr)
         for item in problems:
             print(f"- {item}", file=sys.stderr)
+        from gh_collab import stage_failed
+
+        stage_failed(
+            args.run_id,
+            stage="Implement",
+            error="protected acceptance tests were modified",
+        )
         return 2
 
     build = str((cfg.get("gates") or {}).get("build_gate_cmd") or "").strip()
@@ -67,6 +81,9 @@ def main() -> int:
         built = subprocess.run(["sh", "-c", build], cwd=ROOT, check=False)
         if built.returncode != 0:
             write_state(dirs["run"], status="failed", error="build-gate")
+            from gh_collab import stage_failed
+
+            stage_failed(args.run_id, stage="Implement", error="build_gate_cmd failed")
             return built.returncode or 1
 
     plan_path.write_text(mark_done(plan_path.read_text(encoding="utf-8"), args.run_id, task["id"]), encoding="utf-8")

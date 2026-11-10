@@ -173,6 +173,17 @@ def abort_max_rounds(
     )
     msg = f"aac {paths.run_id}: {cfg.stage} aborted after {rounds_used}/{cfg.max_rounds} review rounds"
     _notify(cfg, msg)
+    try:
+        from gh_collab import stage_failed
+
+        stage_failed(
+            paths.run_id,
+            stage=cfg.stage.capitalize(),
+            error=f"MAX_ROUNDS={cfg.max_rounds} exhausted; blockers={json.dumps(blockers, ensure_ascii=False)}",
+            next_step=resume_hint,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[aac] stage_failed notify skipped: {exc}", flush=True)
     print(f"ABORT MAX_ROUNDS → {abort_path}", flush=True)
     print(f"RESUME:\n{resume_hint}", flush=True)
     return LoopResult(
@@ -220,6 +231,17 @@ def abort_agent_failure(
         error=f"{step}-exit-{rc}",
     )
     _notify(cfg, f"aac {paths.run_id}: agent failure {step} rc={rc}")
+    try:
+        from gh_collab import stage_failed
+
+        stage_failed(
+            paths.run_id,
+            stage=cfg.stage.capitalize(),
+            error=f"agent failure during {step} (exit {rc})",
+            next_step=resume_hint,
+        )
+    except Exception as exc:  # noqa: BLE001 — PR update must not hide abort
+        print(f"[aac] stage_failed notify skipped: {exc}", flush=True)
     print(f"ABORT AGENT → {path}", flush=True)
     return LoopResult(
         approved=False,
