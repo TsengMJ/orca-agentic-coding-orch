@@ -24,16 +24,16 @@ class StageModelsTest(unittest.TestCase):
 
     def test_recommended_matrix(self) -> None:
         self.assertEqual(slot_model(self.cfg, "A", stage="spec"), "composer-2.5")
-        self.assertEqual(slot_model(self.cfg, "B", stage="spec"), "grok-4.6")
-        self.assertEqual(slot_model(self.cfg, "A", stage="plan"), "grok-4.6")
+        self.assertEqual(slot_model(self.cfg, "B", stage="spec"), "grok-4.7")
+        self.assertEqual(slot_model(self.cfg, "A", stage="plan"), "grok-4.7")
         self.assertEqual(slot_model(self.cfg, "B", stage="plan"), "composer-2.5")
         self.assertEqual(slot_model(self.cfg, "B", stage="acceptance"), "composer-2.5")
-        self.assertEqual(slot_model(self.cfg, "A", stage="acceptance"), "grok-4.6")
+        self.assertEqual(slot_model(self.cfg, "A", stage="acceptance"), "grok-4.7")
         self.assertEqual(slot_model(self.cfg, "I", stage="implement"), "composer-2.5")
         self.assertEqual(slot_model(self.cfg, "I", stage="gate"), "composer-2.5")
-        self.assertEqual(slot_model(self.cfg, "B", stage="gate"), "grok-4.6")
+        self.assertEqual(slot_model(self.cfg, "B", stage="gate"), "grok-4.7")
         self.assertEqual(slot_model(self.cfg, "A", stage="final"), "composer-2.5")
-        self.assertEqual(slot_model(self.cfg, "B", stage="final"), "grok-4.5")
+        self.assertEqual(slot_model(self.cfg, "B", stage="final"), "grok-4.7")
 
 
 if __name__ == "__main__":

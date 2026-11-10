@@ -16,31 +16,32 @@ slots:
     args: []
   B:
     runtime: cursor
-    model: grok-4.6
+    model: grok-4.7
     args: []
   # null = inherit owner (roles.owner → slot A by default), then stage_models
   I: null
 
 # Per-stage A/B/I models (Free Cursor pool: grok-4.7 / 4.6 / 4.5 / composer-2.5).
 # Same stage never uses one model for both sides.
+# 2026-11-10: try grok-4.7 for every grok slot now that agent end-signal is fixed.
 stage_models:
   spec:
     A: composer-2.5
-    B: grok-4.6
+    B: grok-4.7
   plan:
-    A: grok-4.6
+    A: grok-4.7
     B: composer-2.5
   acceptance:
-    A: grok-4.6
+    A: grok-4.7
     B: composer-2.5
   implement:
     I: composer-2.5
   gate:
     I: composer-2.5
-    B: grok-4.6
+    B: grok-4.7
   final:
     A: composer-2.5
-    B: grok-4.5
+    B: grok-4.7
 
 roles:
   owner: A
