@@ -49,6 +49,21 @@ def acceptance_commit_paths(root: Path, test_dir: Path, matrix_path: Path) -> li
     return paths
 
 
+def land_acceptance_on_branch(run_id: str, paths: list[str]) -> list[str]:
+    """Commit+push acceptance artifacts onto the run's feature/fix branch."""
+    if not paths:
+        return []
+    import os
+
+    if os.environ.get("AAC_E2E_SKIP", "").strip().lower() in {"1", "true", "yes", "on"}:
+        print(f"S3 land skipped (AAC_E2E_SKIP): {len(paths)} path(s)")
+        return list(paths)
+    from worktree_commit import commit_paths as push_paths
+
+    push_paths(run_id, paths, f"Add acceptance tests for {run_id}.")
+    return list(paths)
+
+
 def run_pytest(cfg: dict, run_id: str) -> subprocess.CompletedProcess[str]:
     gate = str((cfg.get("gates") or {}).get("gate_cmd") or "").strip()
     if not gate:
@@ -204,15 +219,12 @@ def main() -> int:
     print(f"S3 complete. protected={len(payload['files'])} evidence={evidence}")
     # Land acceptance artifacts on the product PR branch (S3 used to leave them
     # only in the orchestrator working tree; PR #11 merged without them).
-    to_commit = acceptance_commit_paths(ROOT, test_dir, matrix_path)
-    if to_commit:
-        from worktree_commit import commit_paths as push_paths
-
-        push_paths(
-            args.run_id,
-            to_commit,
-            f"Add acceptance tests for {args.run_id}.",
-        )
+    landed = land_acceptance_on_branch(
+        args.run_id,
+        acceptance_commit_paths(ROOT, test_dir, matrix_path),
+    )
+    if landed:
+        print(f"S3 landed {len(landed)} acceptance path(s) on branch")
     from gh_collab import stage_complete
     from stage_labels import labels_cfg
 

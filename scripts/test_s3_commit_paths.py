@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""S3 should collect acceptance files + matrix for worktree commit."""
+"""S3 must collect and land acceptance files on the feature branch."""
 
 from __future__ import annotations
 
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from s3_acceptance_loop import acceptance_commit_paths
+from s3_acceptance_loop import acceptance_commit_paths, land_acceptance_on_branch
 
 
 class S3CommitPathsTest(unittest.TestCase):
@@ -33,6 +34,34 @@ class S3CommitPathsTest(unittest.TestCase):
                     f"aac/docs/{run_id}/acceptance-matrix.md",
                 ],
             )
+
+    def test_land_calls_worktree_commit(self) -> None:
+        paths = ["fixtures/dogfood/tests/acceptance/r1/test_a.py"]
+        with mock.patch.dict("os.environ", {"AAC_E2E_SKIP": ""}), mock.patch(
+            "worktree_commit.commit_paths"
+        ) as commit:
+            landed = land_acceptance_on_branch("run-1", paths)
+        commit.assert_called_once_with(
+            "run-1",
+            paths,
+            "Add acceptance tests for run-1.",
+        )
+        self.assertEqual(landed, paths)
+
+    def test_land_skips_empty(self) -> None:
+        with mock.patch("worktree_commit.commit_paths") as commit:
+            landed = land_acceptance_on_branch("run-1", [])
+        commit.assert_not_called()
+        self.assertEqual(landed, [])
+
+    def test_land_skips_under_e2e(self) -> None:
+        paths = ["fixtures/dogfood/tests/acceptance/r1/test_a.py"]
+        with mock.patch.dict("os.environ", {"AAC_E2E_SKIP": "1"}), mock.patch(
+            "worktree_commit.commit_paths"
+        ) as commit:
+            landed = land_acceptance_on_branch("run-1", paths)
+        commit.assert_not_called()
+        self.assertEqual(landed, paths)
 
 
 if __name__ == "__main__":
