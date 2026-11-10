@@ -38,3 +38,4 @@ This keeps self-iteration and dogfood synchronized for the next run.
 - Collaboration invariants locked in: cron signals, stage-end PR updates (incl. failure), product-repo PRs (`collab-invariants.md`).
 - Live collab proof: Issue #8 / PR #9 (Ready → Spec → `/approve` → Plan); failure notes on PR; SSH push fix (`git-ssh-push.md`).
 - Tried `grok-4.7` on every grok stage slot; smoke `pong` + `result` ok (~9s). Watch real stage quality on next full run.
+- Product-behavior round Issue #10 / PR #11 (`twice`): Ready → Spec → Plan → Acceptance → Implement → Gate → merged to `dev`. Self-drove `/approve` without orch marker. Found S3 did not commit acceptance tests (fixed in PR #12 / `s3-commit-acceptance.md`); also fixed S2→S3 spawn via `uv run`.
