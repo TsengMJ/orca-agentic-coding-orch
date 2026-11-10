@@ -34,4 +34,5 @@ This keeps self-iteration and dogfood synchronized for the next run.
 - Local commit fallback without `github.json` (`local-commit-fallback.md`); live commit on `local/s1-20261110T020528Z`.
 - Plan human gate CLI (`plan-human-gate.md` / `s2_human_gate.py`); dogfooded approve.
 - E2E merge no longer calls `gh` before stub (`e2e-merge-before-gh.md`).
-- Open follow-ups: install/`gh`-backed Issue→PR `/approve` against a real draft; workflow_server live cron.
+- Landed orch+dogfood batch on `origin/dev` at `4f94278`; `goal` fast-forwarded to match.
+- Open follow-ups: `gh`-backed Issue→PR `/approve` against a real draft; workflow_server live cron. Keep landing future batches on `origin/dev` and refreshing `goal`.
