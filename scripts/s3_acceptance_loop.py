@@ -38,6 +38,17 @@ def listed_tests(matrix: str, test_dir: Path) -> list[str]:
     return found
 
 
+def acceptance_commit_paths(root: Path, test_dir: Path, matrix_path: Path) -> list[str]:
+    """Relative paths S3 must land on the feature branch after protection."""
+    paths: list[str] = []
+    for path in sorted(test_dir.rglob("*")):
+        if path.is_file():
+            paths.append(str(path.relative_to(root)))
+    if matrix_path.is_file():
+        paths.append(str(matrix_path.relative_to(root)))
+    return paths
+
+
 def run_pytest(cfg: dict, run_id: str) -> subprocess.CompletedProcess[str]:
     gate = str((cfg.get("gates") or {}).get("gate_cmd") or "").strip()
     if not gate:
@@ -191,6 +202,17 @@ def main() -> int:
         encoding="utf-8",
     )
     print(f"S3 complete. protected={len(payload['files'])} evidence={evidence}")
+    # Land acceptance artifacts on the product PR branch (S3 used to leave them
+    # only in the orchestrator working tree; PR #11 merged without them).
+    to_commit = acceptance_commit_paths(ROOT, test_dir, matrix_path)
+    if to_commit:
+        from worktree_commit import commit_paths as push_paths
+
+        push_paths(
+            args.run_id,
+            to_commit,
+            f"Add acceptance tests for {args.run_id}.",
+        )
     from gh_collab import stage_complete
     from stage_labels import labels_cfg
 

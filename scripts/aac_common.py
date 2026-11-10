@@ -367,6 +367,29 @@ def slot_model(cfg: dict, name: str, stage: str | None = None) -> str:
     return resolve_slot(cfg, name, stage=stage)["model"]
 
 
+def spawn_uv_script(
+    script: str,
+    args: list[str],
+    *,
+    log: Path,
+    cwd: Path | None = None,
+) -> subprocess.Popen[str]:
+    """Start a stage script via `uv run` so the child outlives ephemeral uv build envs.
+
+    Spawning with `sys.executable` from a temporary uv env fails later when that
+    path is deleted (seen when S2 tried to start S3 after the temp build vanished).
+    """
+    cmd = ["uv", "run", "--with", "pyyaml", str(ROOT / "scripts" / script), *args]
+    return subprocess.Popen(
+        cmd,
+        cwd=cwd or ROOT,
+        stdout=log.open("a", encoding="utf-8"),
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+        text=True,
+    )
+
+
 def notify_human(message: str, *, title: str = "AAC") -> None:
     """Ping the operator. Terminal line, optional notify_cmd, macOS notification."""
     print(f"\n*** {title}: {message}\n", flush=True)

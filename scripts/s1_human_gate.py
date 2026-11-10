@@ -89,18 +89,12 @@ def main() -> int:
         print(already.stdout.strip())
         return 0
     log = run_dir / "s2-plan.log"
-    proc = subprocess.Popen(
-        [
-            sys.executable,
-            str(ROOT / "scripts" / "s2_plan_loop.py"),
-            "--run-id",
-            args.run_id,
-            "--stream",
-        ],
-        cwd=ROOT,
-        stdout=log.open("a", encoding="utf-8"),
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
+    from aac_common import spawn_uv_script
+
+    proc = spawn_uv_script(
+        "s2_plan_loop.py",
+        ["--run-id", args.run_id, "--stream"],
+        log=log,
     )
     write_state(run_dir, status="plan_started", s2_pid=proc.pid)
     notify_human(f"S2 plan loop started for {args.run_id} pid={proc.pid}", title="AAC plan")
