@@ -341,32 +341,14 @@ def spawn_orch_fix(run_id: str, state: dict, diagnosis: Path, cfg: HealerConfig)
     old_root = os.environ.get("AAC_ROOT")
     os.environ["AAC_ROOT"] = str(work)
     try:
-        # run_cursor always cwd=ROOT; pass an explicit instruction + run via subprocess here.
         timeout_sec = int(os.environ.get("AAC_AGENT_TIMEOUT_SEC", "480"))
-        from aac_common import DONE_SENTINEL, run_command_reaping_done
+        from aac_common import run_cursor
 
-        agent_prompt = env_prompt
-        if DONE_SENTINEL not in agent_prompt:
-            agent_prompt = (
-                agent_prompt.rstrip()
-                + f"\n\nWhen you are finished, print a final line that is exactly `{DONE_SENTINEL}` "
-                + "and exit. Do not keep working after that line.\n"
-            )
-        cmd = [
-            "cursor",
-            "agent",
-            "-p",
-            "--model",
+        # Protocol end signal (stream-json result / process exit), not a prompt field.
+        agent = run_cursor(
             cfg.model,
-            "--output-format",
-            "text",
-            "--force",
-            agent_prompt,
-        ]
-        agent = run_command_reaping_done(
-            cmd,
+            env_prompt,
             timeout_sec=timeout_sec,
-            grace_sec=int(os.environ.get("AAC_DONE_GRACE_SEC", "12")),
             stream=False,
             cwd=work,
         )

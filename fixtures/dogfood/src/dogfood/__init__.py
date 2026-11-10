@@ -15,6 +15,10 @@ def add(a: int, b: int) -> int:
     return int.__add__(a, b)
 
 
+def echo_id(s: str) -> str:
+    return s
+
+
 class Counter:
     def __init__(self, start: int = 0) -> None:
         if not isinstance(start, int):

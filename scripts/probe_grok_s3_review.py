@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-from aac_common import ROOT, DONE_SENTINEL, archive_text, run_cursor, slot_model, load_workflow
+from aac_common import ROOT, STREAM_RESULT_TYPE, archive_text, run_cursor, slot_model, load_workflow
 
 RUN_ID = "feature-add-counter-to-dogfood-pr-6"
 PROBE = ROOT / "aac" / ".run" / RUN_ID / "probe" / "r1"
@@ -78,7 +78,7 @@ def main() -> int:
         "elapsed_sec": round(elapsed, 1),
         "returncode": result.returncode,
         "stdout_bytes": len(result.stdout or ""),
-        "saw_done": DONE_SENTINEL in (result.stdout or ""),
+        "saw_result_event": f'"type":"{STREAM_RESULT_TYPE}"' in (result.stdout or ""),
         "review_written": review_ok,
         "verdict": verdict,
         "stdout_tail": "\n".join((result.stdout or "").splitlines()[-8:]),

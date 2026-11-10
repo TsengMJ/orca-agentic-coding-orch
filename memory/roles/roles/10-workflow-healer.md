@@ -24,7 +24,7 @@
 1. Scan `aac/.run/*/state.json`（忽略已 `healer.ignored` 或終態已處理）。
 2. Classify: `flake` | `publish_retry` | `orch_bug` | `stuck` | `escalate`.
 3. Act within budget; record action; never edit stage product files.
-4. Orch fix agent（若 `healer.orch_fix=auto`）只改允許路徑，最後一行印 `AAC_AGENT_DONE`；開 draft PR 後停。
+4. Orch fix agent（若 `healer.orch_fix=auto`）只改允許路徑；完成由 CLI `stream-json` `result`／process exit 判定，不依賴 prompt 印 done 字段；開 draft PR 後停。
 5. 產品 run 維持 `needs_human` 直到人確認 healing 合併或手動 resume。
 
 ## Output

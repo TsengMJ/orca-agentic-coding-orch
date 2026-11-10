@@ -378,6 +378,12 @@ def mark_pr_ready(run_id: str) -> tuple[int, str]:
 
 def merge_pr(pr: int, run_id: str) -> tuple[int, str]:
     cfg = labels_cfg()
+    # E2E must short-circuit before any `gh` call — CI/dogfood hosts may lack gh.
+    if __import__("os").environ.get("AAC_E2E_SKIP", "").strip() in {"1", "true", "yes"}:
+        from aac_common import write_state
+
+        write_state(ROOT / "aac" / ".run" / run_id, status="merged", human_gate="merged")
+        return 0, f"merged PR #{pr} into dev (e2e)"
     set_exclusive_pr_label(pr, cfg["gate_approved"])
     post_pr_comment(
         pr,
@@ -387,11 +393,6 @@ def merge_pr(pr: int, run_id: str) -> tuple[int, str]:
             next_step="No further human gate",
         ),
     )
-    if __import__("os").environ.get("AAC_E2E_SKIP", "").strip() in {"1", "true", "yes"}:
-        from aac_common import write_state
-
-        write_state(ROOT / "aac" / ".run" / run_id, status="merged", human_gate="merged")
-        return 0, f"merged PR #{pr} into dev (e2e)"
     base = str(gh_cfg().get("base") or "dev")
     # Ensure non-draft before merge (S6 should already have done this).
     run(["gh", "pr", "ready", str(pr), "--repo", repo()], check=False)

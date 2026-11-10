@@ -175,11 +175,18 @@ def main() -> int:
         pending = dirs["run"] / "HUMAN_GATE_PLAN_PENDING.md"
         pending.write_text(
             f"# Human gate — Plan (`{args.run_id}`)\n\nPlan: `{plan_path.relative_to(ROOT)}`\n\n"
-            "Approve by writing HUMAN_GATE_PLAN_APPROVED.md or set human_gate_plan false.\n",
+            "Approve:\n\n"
+            f"```bash\nuv run --with pyyaml scripts/s2_human_gate.py --run-id {args.run_id} --approve\n```\n\n"
+            "Or abort with `--abort`. GitHub `/approve` on the Plan-labeled PR also continues.\n",
             encoding="utf-8",
         )
         write_state(dirs["run"], status="awaiting_human_plan_gate", stage="plan")
         print(f"HUMAN PLAN GATE PENDING → {pending}")
+        print(
+            f"*** AAC plan gate: Plan ready for approval: {args.run_id}. "
+            f"uv run --with pyyaml scripts/s2_human_gate.py --run-id {args.run_id} --approve",
+            flush=True,
+        )
         return 0
 
     write_state(dirs["run"], status="plan_approved", stage="plan", plan_tasks=ids)

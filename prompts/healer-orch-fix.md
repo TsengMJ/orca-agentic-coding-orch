@@ -41,4 +41,5 @@ This is not a product-feature task for the dogfood app.
 3. Write `memory/lessons/` note (short, actionable).
 4. Leave changes committed on the current branch if the healer already created one; otherwise leave a clean diff summary in the diagnosis file under `## Applied fix`.
 
-When finished, print a final line that is exactly `AAC_AGENT_DONE` and exit.
+When finished, stop. The workflow detects completion from the agent CLI end
+signal (`stream-json` `result` / process exit) — do not print a custom done marker.

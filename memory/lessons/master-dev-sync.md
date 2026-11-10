@@ -4,3 +4,11 @@
 - Workflow/infra lands on `master`; when they diverge, **merge `master` → `dev`**, do not reset either side.
 - Expected end state: `master` is an ancestor of `dev`; `dev` may be ahead with dogfood feature commits.
 - Sole typical conflict: `fixtures/dogfood/src/dogfood/__init__.py` — keep feature APIs from `dev` and hardening from `master` (e.g. `add` type checks + `Counter`).
+
+## Goal-branch self-iteration
+
+While a long-running `/goal` self-iteration uses a local `goal` branch:
+
+- Land **orch fixes and dogfood** onto **`origin/dev`** (not only on `goal`).
+- Refresh `goal` from the latest `origin/dev` so the next iteration starts synchronized.
+- Details: `memory/lessons/self-iteration-dogfood.md` → Branch sync.

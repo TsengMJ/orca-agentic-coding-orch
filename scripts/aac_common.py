@@ -92,18 +92,109 @@ def append_suggestions(run_dir: Path, stage: str, round_n: int, suggestions: lis
         f.write("\n".join(block))
 
 
+# Legacy prompt-printed marker. Recognized if an old prompt still emits it, but
+# never injected: completion must come from cursor agent stream-json `result`
+# (or process exit). Prompt-dependent end fields caused silent 480s hangs.
 DONE_SENTINEL = "AAC_AGENT_DONE"
+STREAM_RESULT_TYPE = "result"
+
+
+def _close_pipes(proc: subprocess.Popen[str]) -> None:
+    if proc.stdout is not None:
+        try:
+            proc.stdout.close()
+        except OSError:
+            pass
 
 
 def _reap(proc: subprocess.Popen[str]) -> None:
-    if proc.poll() is not None:
-        return
-    proc.terminate()
+    if proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+    _close_pipes(proc)
+
+
+def _parse_end_signal(line: str) -> tuple[bool, int | None]:
+    """Return (saw_end, forced_rc). forced_rc is set for stream-json error results."""
+    stripped = line.strip()
+    if not stripped:
+        return False, None
+    if DONE_SENTINEL in stripped and not stripped.lstrip().startswith("{"):
+        return True, 0
     try:
-        proc.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait(timeout=5)
+        event = json.loads(stripped)
+    except json.JSONDecodeError:
+        if DONE_SENTINEL in stripped:
+            return True, 0
+        return False, None
+    if not isinstance(event, dict):
+        return False, None
+    if event.get("type") == STREAM_RESULT_TYPE:
+        is_error = event.get("is_error") is True or event.get("subtype") == "error"
+        return True, (1 if is_error else 0)
+    return False, None
+
+
+def _tool_call_label(tool_call: object) -> str:
+    if not isinstance(tool_call, dict):
+        return "tool"
+    for key, payload in tool_call.items():
+        if key in {"hookAdditionalContexts", "toolCallId", "startedAtMs"}:
+            continue
+        name = key[:-8] if key.endswith("ToolCall") else key
+        detail = ""
+        if isinstance(payload, dict):
+            args = payload.get("args")
+            if isinstance(args, dict):
+                for field in ("path", "globPattern", "command", "pattern", "query"):
+                    if args.get(field):
+                        detail = f" {args[field]}"
+                        break
+        return f"{name}{detail}"
+    return "tool"
+
+
+def _stream_line(line: str) -> None:
+    """Pretty-print stream-json when possible; otherwise echo the raw line.
+
+    Tool starts are shown so a long tool-only stretch is not mistaken for a hang.
+    """
+    stripped = line.strip()
+    if not stripped:
+        return
+    try:
+        event = json.loads(stripped)
+    except json.JSONDecodeError:
+        print(line, flush=True)
+        return
+    if not isinstance(event, dict):
+        print(line, flush=True)
+        return
+    etype = event.get("type")
+    if etype == "assistant":
+        message = event.get("message") or {}
+        content = message.get("content") if isinstance(message, dict) else None
+        if isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    text = part.get("text")
+                    if text:
+                        print(text, end="", flush=True)
+        return
+    if etype == "tool_call" and event.get("subtype") == "started":
+        label = _tool_call_label(event.get("tool_call"))
+        print(f"\n[aac] tool {label}", flush=True)
+        return
+    if etype == "thinking" and event.get("subtype") == "delta":
+        return
+    if etype == STREAM_RESULT_TYPE:
+        subtype = event.get("subtype") or "?"
+        print(f"\n[aac] agent result subtype={subtype}\n", flush=True)
+        return
 
 
 def run_command_reaping_done(
@@ -115,9 +206,10 @@ def run_command_reaping_done(
     cwd: Path,
     banner: str = "",
 ) -> subprocess.CompletedProcess[str]:
-    """Run cmd. If it prints AAC_AGENT_DONE and does not exit, reap it as success.
+    """Run cmd; treat stream-json `result` (or process exit) as the end signal.
 
-    Uses select() so a silent process cannot block past timeout_sec (readline bug).
+    If the CLI emits a protocol end event but does not exit, reap after grace_sec.
+    Uses select() so a silent process cannot block past timeout_sec.
     """
     import select
     import time
@@ -137,29 +229,36 @@ def run_command_reaping_done(
     pending = ""
     saw_done = False
     done_at: float | None = None
+    forced_rc: int | None = None
     start = time.monotonic()
 
     def _text() -> str:
         return "".join(chunks)
+
+    def _note_and_return(note: str, rc: int) -> subprocess.CompletedProcess[str]:
+        if stream:
+            print(note, end="", flush=True)
+        return subprocess.CompletedProcess(cmd, rc, _text() + note, "")
 
     try:
         while True:
             now = time.monotonic()
             if saw_done and done_at is not None and now - done_at >= grace_sec:
                 _reap(proc)
-                note = f"\n[aac] reaped agent {grace_sec}s after {DONE_SENTINEL} (process did not exit)\n"
-                if stream:
-                    print(note, end="", flush=True)
-                return subprocess.CompletedProcess(cmd, 0, _text() + note, "")
+                rc = 0 if forced_rc is None else forced_rc
+                note = (
+                    f"\n[aac] reaped agent {grace_sec}s after end signal "
+                    f"(process did not exit)\n"
+                )
+                return _note_and_return(note, rc)
             if timeout_sec > 0 and now - start >= timeout_sec:
                 _reap(proc)
                 if saw_done:
-                    note = f"\n[aac] reaped agent at wall timeout after {DONE_SENTINEL}\n"
-                    return subprocess.CompletedProcess(cmd, 0, _text() + note, "")
+                    rc = 0 if forced_rc is None else forced_rc
+                    note = "\n[aac] reaped agent at wall timeout after end signal\n"
+                    return _note_and_return(note, rc)
                 note = f"\n[aac] cursor agent timed out after {timeout_sec}s\n"
-                if stream:
-                    print(note, end="", flush=True)
-                return subprocess.CompletedProcess(cmd, 124, _text() + note, "")
+                return _note_and_return(note, 124)
 
             wait = 0.5
             if saw_done and done_at is not None:
@@ -181,21 +280,34 @@ def run_command_reaping_done(
                 continue
             text = data.decode("utf-8", "replace")
             chunks.append(text)
-            if stream:
-                print(text, end="", flush=True)
             pending += text
             while "\n" in pending:
                 line, pending = pending.split("\n", 1)
-                if DONE_SENTINEL in line and not saw_done:
+                if stream:
+                    _stream_line(line)
+                end, rc_hint = _parse_end_signal(line)
+                if end and not saw_done:
                     saw_done = True
                     done_at = time.monotonic()
-        if DONE_SENTINEL in pending and not saw_done:
-            saw_done = True
+                    if rc_hint is not None:
+                        forced_rc = rc_hint
+        if pending:
+            if stream:
+                _stream_line(pending)
+            end, rc_hint = _parse_end_signal(pending)
+            if end and not saw_done:
+                saw_done = True
+                if rc_hint is not None:
+                    forced_rc = rc_hint
         rc = proc.wait()
+        _close_pipes(proc)
         if stream:
             print("\n── end stream ──\n", flush=True)
-        if saw_done and rc != 0:
-            rc = 0
+        if saw_done:
+            if forced_rc is not None:
+                rc = forced_rc
+            elif rc != 0:
+                rc = 0
         return subprocess.CompletedProcess(cmd, rc, _text(), "")
     except Exception:
         _reap(proc)
@@ -209,20 +321,15 @@ def run_cursor(
     force: bool = True,
     timeout_sec: int | None = None,
     stream: bool = False,
+    cwd: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     if timeout_sec is None:
         timeout_sec = int(os.environ.get("AAC_AGENT_TIMEOUT_SEC", "480"))
     grace_sec = int(os.environ.get("AAC_DONE_GRACE_SEC", "12"))
     if os.environ.get("AAC_STREAM", "").strip().lower() in {"1", "true", "yes", "on"}:
         stream = True
-    # One contract for every call: last line must be the sentinel so a hung CLI
-    # can be reaped as success instead of burning the full timeout.
-    if DONE_SENTINEL not in prompt:
-        prompt = (
-            prompt.rstrip()
-            + f"\n\nWhen you are finished, print a final line that is exactly `{DONE_SENTINEL}` "
-            + "and exit. Do not keep working after that line.\n"
-        )
+    # End-of-run is the CLI protocol (`--output-format stream-json` → type=result)
+    # or process exit — never a prompt-required printed field.
     cmd = [
         "cursor",
         "agent",
@@ -230,7 +337,7 @@ def run_cursor(
         "--model",
         model,
         "--output-format",
-        "text",
+        "stream-json",
     ]
     if force:
         cmd.append("--force")
@@ -241,7 +348,7 @@ def run_cursor(
         timeout_sec=timeout_sec,
         grace_sec=grace_sec,
         stream=stream,
-        cwd=ROOT,
+        cwd=cwd or ROOT,
         banner=banner,
     )
 

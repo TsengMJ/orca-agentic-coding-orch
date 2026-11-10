@@ -138,7 +138,11 @@ def continue_run(run_id: str, pr: int | None = None) -> tuple[int, str]:
             return code, tail
         return _run("s2_plan_loop.py", run_id, ["--stream", "--no-continue"] if not _e2e() else ["--skip-agents", "--no-continue"])
     if action == "approve_plan":
-        write_state(ROOT / "aac" / ".run" / run_id, status="plan_approved")
+        # Mark plan approved without spawning S3 here; always start S3 next
+        # (mirrors approve_spec → s2 with an explicit second step).
+        code, tail = _run("s2_human_gate.py", run_id, ["--approve", "--no-continue"])
+        if code != 0:
+            return code, tail
         return _run("s3_acceptance_loop.py", run_id, ["--stream"])
     if action == "start_s3":
         return _run("s3_acceptance_loop.py", run_id, ["--stream"])
@@ -155,6 +159,11 @@ def continue_run(run_id: str, pr: int | None = None) -> tuple[int, str]:
         meta = load_github_meta(run_id)
         number = pr or meta.get("pr")
         if not number:
+            if meta.get("local"):
+                return (
+                    1,
+                    "local run has no PR — publish a draft PR (gh_collab publish) before merge",
+                )
             return 1, "missing PR number for merge"
         return merge_pr(int(number), run_id)
     if action == "already_running":

@@ -28,7 +28,7 @@ EOF
 ── cursor stream model=composer-2.5 ──    # B 審查
 ```
 
-Agent 文字會**邊產邊印**；結束仍會寫進 `aac/.run/<run_id>/archive/`。
+Agent 文字會**邊產邊印**；工具開始會出現 `[aac] tool …`；結束看 `[aac] agent result subtype=…`（CLI `stream-json` 結束訊號，不是 prompt 印 done 字段）。完整 NDJSON 仍進 `aac/.run/<run_id>/archive/`。
 
 ### Terminal 2 — 盯檔案交互（產物才是協議）
 

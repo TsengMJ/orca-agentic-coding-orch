@@ -22,7 +22,7 @@ reviewer (fresh each round)
 1. **Only blockers** reopen the loop. Suggestions append to `suggestions.md` and wait for final stage.
 2. **`MAX_ROUNDS` (default 3)** bounds review rounds **and** command-gate repairs. Raising it is a config change, not an ad-hoc resume past the cap.
 3. **Fail closed** on missing/invalid `verdict.json`.
-4. **Agent call failure / timeout** is repaired like a gate failure: feed the last log lines back, retry the **same** call up to `agent_call_retries`. If still failing → abort the run (do not hang, do not silently edit artifacts as the coordinator).
+4. **Agent call failure / timeout** is repaired like a gate failure: feed the last log lines back, retry the **same** call up to `agent_call_retries`. If still failing → abort the run (do not hang, do not silently edit artifacts as the coordinator). Completion is the Cursor CLI end signal (`stream-json` `type=result` or process exit), never a prompt-required printed field.
 5. **Resume** restores workflow state and continues from the incomplete stage with a **fresh** agent process — it is not unbounded extra review rounds beyond `MAX_ROUNDS` unless the operator raises `gates.max_rounds` / `AAC_MAX_ROUNDS` for that attempt.
 
 ## What went wrong in dogfood `s1-20261109T081826Z`
