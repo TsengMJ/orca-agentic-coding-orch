@@ -223,12 +223,12 @@ def main() -> int:
         print("S3 already running")
         return 0
     log = dirs["run"] / "s3-acceptance.log"
-    proc = subprocess.Popen(
-        [sys.executable, str(ROOT / "scripts" / "s3_acceptance_loop.py"), "--run-id", args.run_id, "--stream"],
-        cwd=ROOT,
-        stdout=log.open("a", encoding="utf-8"),
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
+    from aac_common import spawn_uv_script
+
+    proc = spawn_uv_script(
+        "s3_acceptance_loop.py",
+        ["--run-id", args.run_id, "--stream"],
+        log=log,
     )
     write_state(dirs["run"], status="acceptance_started", s3_pid=proc.pid)
     print(f"S3 started pid={proc.pid} log={log}")
