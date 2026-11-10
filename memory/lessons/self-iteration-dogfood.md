@@ -36,5 +36,5 @@ This keeps self-iteration and dogfood synchronized for the next run.
 - E2E merge no longer calls `gh` before stub (`e2e-merge-before-gh.md`).
 - Landed orch+dogfood batch on `origin/dev` at `4f94278`; `goal` fast-forwarded to match.
 - Collaboration invariants locked in: cron signals, stage-end PR updates (incl. failure), product-repo PRs (`collab-invariants.md`).
-- Open follow-ups: `gh auth login` then live Issue→PR `/approve` dogfood; workflow_server cron against a real draft. Keep landing batches on `origin/dev`.
-- **Queued (do not start yet):** after current collab/`gh` blockers are cleared, try `grok-4.7` for every stage that currently uses grok (end-signal fix already landed).
+- Live collab proof: Issue #8 / PR #9 (Ready → Spec → `/approve` → Plan); failure notes on PR; SSH push fix (`git-ssh-push.md`).
+- Tried `grok-4.7` on every grok stage slot; smoke `pong` + `result` ok (~9s). Watch real stage quality on next full run.
