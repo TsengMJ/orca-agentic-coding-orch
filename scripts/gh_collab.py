@@ -50,6 +50,21 @@ def run(cmd: list[str], *, check: bool = True, cwd: Path | None = None) -> subpr
     return result
 
 
+def github_ssh_url(run_id: str | None = None) -> str:
+    """Push URL for the product repo. Avoid HTTPS remotes that prompt in non-interactive agents."""
+    return f"git@github.com:{repo(run_id)}.git"
+
+
+def git_push_head(work: Path, branch: str, *, run_id: str | None = None, set_upstream: bool = True) -> None:
+    url = github_ssh_url(run_id)
+    cmd = ["git", "push"]
+    if set_upstream:
+        cmd += ["-u", url, f"HEAD:{branch}"]
+    else:
+        cmd += [url, f"HEAD:{branch}"]
+    run(cmd, cwd=work)
+
+
 def repo(run_id: str | None = None) -> str:
     """Product repo for Issues/PRs — not necessarily the orch checkout.
 
@@ -268,7 +283,7 @@ def publish(issue: int, run_id: str, *, cwd: Path | None = None) -> str:
     commit = run(["git", "status", "--porcelain"], check=False, cwd=work)
     if commit.stdout.strip():
         run(["git", "commit", "-m", f"Add spec for #{issue}.\n\nRun {run_id}."], cwd=work)
-    run(["git", "push", "-u", "origin", branch], cwd=work)
+    git_push_head(work, branch, run_id=run_id, set_upstream=True)
 
     existing = run(
         ["gh", "pr", "list", "--repo", repo(), "--head", branch, "--json", "number,url,isDraft"],
@@ -310,7 +325,7 @@ def publish(issue: int, run_id: str, *, cwd: Path | None = None) -> str:
         status = run(["git", "status", "--porcelain"], check=False, cwd=work)
         if status.stdout.strip():
             run(["git", "commit", "-m", f"Name run {final_id}."], cwd=work)
-            run(["git", "push"], cwd=work)
+            git_push_head(work, branch, run_id=final_id, set_upstream=False)
 
     cfg = labels_cfg()
     set_exclusive_pr_label(pr_number, cfg["spec"])

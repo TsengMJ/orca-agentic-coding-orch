@@ -84,5 +84,9 @@ def commit_paths(run_id: str, paths: list[str], message: str) -> None:
     if local:
         print(f"local commit on {branch} (no push): {message}")
         return
-    git(["push", "origin", f"HEAD:{branch}"], cwd=work)
+    # Prefer SSH URL so non-interactive agents are not blocked by HTTPS prompts.
+    from gh_collab import github_ssh_url
+
+    url = github_ssh_url(run_id)
+    git(["push", "-u", url, f"HEAD:{branch}"], cwd=work)
     print(f"pushed {message} to {branch}")

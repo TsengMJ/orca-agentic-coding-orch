@@ -37,3 +37,4 @@ This keeps self-iteration and dogfood synchronized for the next run.
 - Landed orch+dogfood batch on `origin/dev` at `4f94278`; `goal` fast-forwarded to match.
 - Collaboration invariants locked in: cron signals, stage-end PR updates (incl. failure), product-repo PRs (`collab-invariants.md`).
 - Open follow-ups: `gh auth login` then live Issue→PR `/approve` dogfood; workflow_server cron against a real draft. Keep landing batches on `origin/dev`.
+- **Queued (do not start yet):** after current collab/`gh` blockers are cleared, try `grok-4.7` for every stage that currently uses grok (end-signal fix already landed).

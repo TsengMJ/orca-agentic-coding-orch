@@ -26,3 +26,11 @@ Three known requirements for bulk use of this orch against real projects. Re-ver
 2. Label a Ready issue on the **product** repo; server claims and publishes a draft PR **there**.
 3. Force an agent abort; confirm the PR (or Issue) gets a `**… failed.**` note.
 4. `/approve` on Spec advances to Plan.
+
+## Live proof (2026-11-10)
+
+- Issue [#8](https://github.com/TsengMJ/orca-agentic-coding-orch/issues/8) `Ready` listed by `list_ready_issues`.
+- Draft PR [#9](https://github.com/TsengMJ/orca-agentic-coding-orch/pull/9) on product repo `TsengMJ/orca-agentic-coding-orch` with `Spec`.
+- `stage_failed` posted `**Spec failed.**` on the PR.
+- Human `/approve` + `gh_collab watch` → `Spec_Approved` → S2 → `Plan` label / `plan_approved`.
+- Extra fix: `publish` / remote commits push via `git@github.com:…` because HTTPS `origin` prompts fail in agents.
